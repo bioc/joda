@@ -1,0 +1,5 @@
+export(differential.probs,
+       regulation.scores,
+       deregulation.scores
+       )
+

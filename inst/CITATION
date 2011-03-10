@@ -1,0 +1,17 @@
+citHeader("To cite the R package 'joda' in publications use:")
+
+citEntry(entry  = "unpublished",
+	title = "Deregulation upon DNA damage revealed by joint analysis of context-specific perturbation data.",
+	author = personList(
+		person(given="Ewa", family="Szczurek",
+		    email="szczurek@molgen.mpg.de"),
+		person(given="Florian", family="Markowetz"),         
+	 	person(given="Irit", family="Gat-Viks"),         
+		person(given="Przemyslaw", family="Biecek"),
+            	person(given="Jerzy", family="Tiuryn"),
+	    	person(given="Martin", family="Vingron")),      
+	year = 2011,
+	note = "Webpage: http://joda.molgen.mpg.de/",
+        textVersion = paste("Ewa Szczurek, Florian Markowetz, Irit Gat-Viks, Przemyslaw Biecek, Jerzy Tiuryn and Martin Vingron (2010).",
+"Deregulation upon DNA damage revealed by joint analysis of context-specific perturbation data.", "Submitted.")
+        )

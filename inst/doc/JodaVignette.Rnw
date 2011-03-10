@@ -1,0 +1,191 @@
+%\VignetteIndexEntry{Introduction to joda}
+%\VignetteDepends{joda}
+%\VignetteKeywords{joda, gene deregulation, gene expression, pathways}
+%\VignettePackage{joda}
+\documentclass[11pt]{article}
+
+\usepackage{times}
+\usepackage{hyperref}
+\usepackage{epsfig}
+\usepackage{graphicx}
+\usepackage{url}
+\usepackage{natbib}
+
+\newcommand{\Rfunction}[1]{{\texttt{#1}}}
+\newcommand{\Robject}[1]{{\texttt{#1}}}
+\newcommand{\Rpackage}[1]{{\textit{#1}}}
+\newcommand{\Rmethod}[1]{{\texttt{#1}}}
+\newcommand{\Rfunarg}[1]{{\texttt{#1}}}
+\newcommand{\Rclass}[1]{{\textit{#1}}}
+\newcommand{\Rcode}[1]{{\texttt{#1}}}
+
+\newcommand{\joda}{{\Rpackage{joda} } }
+
+\title{ {\Rpackage{joda}} Package Vignette }
+\author{Ewa Szczurek}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+
+<<options,echo=FALSE>>=
+options(width=70)
+@ 
+\tableofcontents
+\section{Introduction}
+This document gives a short introduction to gene deregulation analysis using the {\bf{R}} package {\Rpackage{joda}}. The package implements an algorithm called JODA, which is designed to quantify
+how strongly regulation of genes changes between two different cell populations. JODA analyzes a given set of regulators, which are interconnected in a common signaling pathway.  The algorithm utilizes  two types of input: (1) regulator knockdown data, as well as (2) knowledge about  pathways that interconnect the regulators and about genes that are expected to be regulated by those pathways in both cells. For each regulator the analysis yields  gene deregulation scores. The scores reflect how strongly the effect of the regulator's knockdown on the genes changed between the cells.  
+
+The input to the algorithm and processing steps and are illustrated in Figure 1.  
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=0.5\linewidth]{figures/JODA.png}
+  \caption{The input and steps of the JODA algorithm }
+  \label{fig:box1}
+\end{figure}
+
+\section{Input to the JODA algorithm.}
+<<inputdata>>
+
+We present the application of the {\Rpackage{joda}} package to deregulation analysis on an example dataset of Elkon {\em{et al.}}, 2005.  The JODA algorithm computes deregulation scores for a given set of regulators (in the example dataset ATM, RelA and p53). The input data has to contain gene expression measurements upon knockdown of each regulator in each cell population. The example input is stored in the \Robject{damage} dataset.
+
+<<preliminaries>>=
+library(joda)
+data(damage)
+@ 
+
+The example dataset contains transcriptional effects of silencing the regulators ATM, RelA and p53, performed on two cell populations, referred to as the healthy and the damaged cells (together six knockdown experiments). The data for each knockdown experiment are preprocessed log expression ratios of a regulator knockdown versus control in a given cell population.  The damaged cells (denoted {\em{d}}) are a population of cells that were treated with a DNA-damage inducing drug neocarzinostatin (NCS). NCS triggers a cellular pathway, where the central kinase ATM signals down to transcription factors RelA and p53. This pathway is inactive in the healthy cells (denoted {\em{h}}). 
+
+The knockdown data are (in two data frames)  \Robject{data.healthy} and \Robject{data.damage}. 
+<<>>=
+head(data.healthy)
+head(data.damage)
+@
+
+<<inputknowledge>>
+
+Additional to the knockdown data, the input to the JODA algorithm consists of two kinds of knowledge. First, topologies of the pathways that connect the given set of regulators and are active in the two cell populations. This knowledge is formalized in two binary matrix models, one per each
+cell population. For each regulator, the model defines a set of knockdown experiments which affect this regulator's activity. Example model matrices for the ATM pathway in the healthy and in the damaged cells are shown in Figure 1  and stored in objects {\Robject{model.healthy}} and {\Robject{model.damage}}.
+
+<<>>=
+print(model.healthy)
+print(model.damage)
+@
+
+Here, the first row of {\Robject{model.damage}} tells that in the damaged cells the knockdown of ATM affects not only  ATM, but also RelA and p53, which are downstream of ATM. 
+
+
+The second kind of knowledge are regulator-gene relations, given for some regulators, which are also transcription factors (shortly, TFs), and for some remaining genes. This knowledge is cell-population specific. The known TF targets are expected (but rarely sure) to show an effect to the knockdown experiments, and serve as examples of genes that are differentially expressed upon their TF knockdown. This type of knowledge is uncertain and is given as probabilities. The example input stores  certainties (beliefs) about known targets of RelA or p53 being differentially expressed upon their regulator knockdown in the two cell populations.
+
+<<>>=
+str(beliefs.healthy)
+str(beliefs.damage)
+head(beliefs.healthy[["p53"]])
+@
+ 
+ <<steps>>
+
+ \section{Processing steps}
+ 
+ The algorithm proceeds in three steps. In each step, we compute the following scores for each regulator:
+\begin{enumerate}
+\item For each gene, in each cell population: signed probabilities of differential expression upon the regulator's knockdown,
+\item For each  gene, in each cell population:  regulation scores,
+\item For each gene: deregulation scores.
+\end{enumerate}
+
+<<step1>>
+
+\subsection{Step 1: computing signed differential expression probabilities}
+
+In the first step, the input data from each regulator's knockdown is processed to estimate the effect of the knockdown on the genes. To this end, JODA utilizes our belief-based differential expression analysis method, implemented in an {\bf{R}} package {\Rpackage{bgmm}}. The method assigns each gene a probability that it was differentially expressed in the
+experiment. In this step, the knowledge about the known TF targets is used. To improve the estimation,
+the known targets of the perturbed regulator are given a high prior of differential expression in the experiment. Each returned probability is signed, i.e., multiplied by 1 or -1 to indicate whether the effect of the knockdown was up- or down-regulation.
+
+To compute the signed differential gene expression probabilities for each knockdown experiment, the \Rfunction{differential.probs} function is used. When
+the argument  \Robject{verbose} is set to \Robject{TRUE} the function prints the parameters of the fitted two-component models (one component for the differential and one for the unchanged genes). Setting the argument  \Robject{plot.it} to \Robject{TRUE} yields a plot of the models' components. For the knockdown data and knowledge in the healthy cells the function call reads (the generated plot is presented in Figure 2):
+
+<<>>=
+probs.healthy=differential.probs(data=data.healthy, beliefs=beliefs.healthy, verbose=TRUE, plot.it=TRUE)
+@
+
+
+
+%\begin{figure}[h]
+  %\centering
+  %\includegraphics[width=\linewidth]{figures/healthyM.png}
+  %\caption{Output of the differential.probs function applied to the data and knowledge for the healthy cells.}
+  %\label{fig:healthy}
+%\end{figure}
+
+\begin{figure}[h]
+\begin{center}
+<<fig-healthyM,fig=TRUE,echo=FALSE>>=
+probs.healthy=differential.probs(data=data.healthy, beliefs=beliefs.healthy, verbose=FALSE, plot.it=TRUE)
+@
+\caption{\label{fig:healthyM} Output of the differential.probs function applied to the data and knowledge for the healthy cells.}
+\end{center}
+\end{figure}
+
+For the knockdown data and knowledge in the damaged cells the function call reads (the generated plot is presented in Figure 3):
+
+<<>>=
+probs.damage=differential.probs(data=data.damage, beliefs=beliefs.damage, verbose=TRUE, plot.it=TRUE)
+@
+
+%\begin{figure}[h]
+%  \centering
+ % \includegraphics[width=\linewidth]{figures/damageM.png}
+ % \caption{Output of the \Rfunction{differential.probs} function applied to the data and knowledge for the damaged cells.}
+  %\label{fig:damage}
+%\end{figure}
+
+\begin{figure}[h]
+\begin{center}
+<<fig-damageM,fig=TRUE,echo=FALSE>>=
+probs.damage=differential.probs(data=data.damage, beliefs=beliefs.damage, verbose=FALSE, plot.it=TRUE)
+@
+\caption{\label{fig:damageM} Output of the \Rfunction{differential.probs} function applied to the data and knowledge for the damaged cells. }
+\end{center}
+\end{figure}
+
+<<step2>>
+
+\subsection{Step 2: computing regulation scores}
+In the second step, for each regulator  and for each cell population, we obtain a vector of regulation scores
+that quantify the effect of the regulator on the genes in this population. In this step, the given pathway models are used. For a given cell population and regulator, regulation scores are computed as an average over the
+probabilities of differential expression in all knockdown experiments that affect this regulator in this cell
+population. The affecting experiments are defined using the pathway model as both the knockdown of
+the regulator itself, and knockdowns of its upstream activators in the pathway. For example, the regulation scores 
+ for RelA in the damaged cells are an average of signed probabilities for the knockdowns of RelA and of its upstream activator ATM. In the healthy cells, only its own knockdown affects RelA, and its regulation scores  are the same as its signed probabilities.
+
+<<>>=
+regulation.healthy= regulation.scores(probs.healthy, model.healthy, TRUE) 
+head(regulation.healthy) 
+regulation.damage= regulation.scores(probs.damage, model.damage, TRUE) 
+head(regulation.damage) 
+@
+
+<<step3>>
+
+\subsection{Step 3: computing deregulation scores}
+In the third step, to quantify deregulation of genes by a given regulator, we compute a  vector of deregulation scores as a difference between the regulation scores  for this regulator in the two cell populations.
+
+<<>>=
+deregulation= deregulation.scores(reg.scores1=regulation.healthy, reg.scores2=regulation.damage, TRUE) 
+head(deregulation)
+@
+
+Genes which obtain negative deregulation scores are interpreted as 
+more activated by the regulator in the cells corresponding to the second argument (here, the damaged cells). Genes
+more activated in the other cells (here, healthy) obtain positive scores. For example, to see the top genes most activated by p53 in the damaged cells, we sort the genes by their deregulation scores:
+
+<<>>=
+head(rownames(deregulation)[order(deregulation[,"p53"])])
+@
+
+
+\end{document}
