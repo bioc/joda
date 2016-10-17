@@ -1,7 +1,7 @@
 Package: joda
 Type: Package
 Title: JODA algorithm for quantifying gene deregulation using knowledge
-Version: 1.21.0
+Version: 1.22.0
 Date: 2011-04-03
 Author: Ewa Szczurek
 Description: Package 'joda' implements three steps of an algorithm
